@@ -1,0 +1,3 @@
+# Ignore WhatsApp session files
+.wwebjs_auth
+.wwebjs_auth/

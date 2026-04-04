@@ -11,7 +11,7 @@ build/
 # WhatsApp Web.js + Puppeteer ignores
 .wwebjs_auth/
 .wwebjs_cache/
-whatsapp-session/
+whatsapp-data/
 *.pem
 
 # Puppeteer/Chromium cache (critical for this repo)
@@ -39,4 +39,5 @@ bfg.jar
 **/*.exe
 chrome*/
 
-
+#other 
+TODO.md

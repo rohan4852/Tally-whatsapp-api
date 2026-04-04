@@ -19,19 +19,24 @@ const client = new Client({
         protocolTimeout: 60000,
         timeout: 60000,
         ignoreHTTPSErrors: true,
+        defaultViewport: null,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
+            '--no-zygote',
+            '--single-process',
             '--disable-gpu',
             '--disable-background-timer-throttling',
             '--disable-backgrounding-occluded-windows',
             '--disable-renderer-backgrounding',
+            '--disable-extensions',
+            '--disable-plugins',
             '--disable-web-security',
             '--disable-features=VizDisplayCompositor',
-            '--user-data-dir=./whatsapp-session'
+            '--user-data-dir=./whatsapp-data'
         ]
     }
 });

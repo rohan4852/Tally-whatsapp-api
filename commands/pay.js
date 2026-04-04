@@ -1,12 +1,12 @@
 const { generateReceiptXML, tallyImport, parseImportResponse } = require('../utils/tally-import.js');
 
-const AUTH_MOBILES = ['919876543210']; // TODO: Add your WhatsApp numbers (country code, e.g. '91xxxxxxxxxx')
+const AUTH_MOBILES = ['918329724788']; // YOUR NUMBER ENABLED!
 
 async function handlePay(from, body, client) {
     // Parse /pay 5000 Rohan
-    const match = body.match(/^\/pay\\s+([0-9.]+)\\s+(.+)/i);
+    const match = body.match(/^\/pay\s+([0-9.]+)\s+(.+)/i);
     if (!match) {
-        return client.sendMessage(from, 'Usage: /pay <amount> <party>\\nEx: /pay 5000 Rohan');
+        return client.sendMessage(from, 'Usage: /pay <amount> <party>\nEx: /pay 5000 Rohan');
     }
 
     const amount = parseFloat(match[1]);
@@ -24,10 +24,11 @@ async function handlePay(from, body, client) {
         const result = parseImportResponse(rawResponse);
 
         if (result.success) {
-            await client.sendMessage(from, `✅ Payment Recorded!\\nVoucher: ${result.voucherNo}\\nAmount: Rs.${amount.toLocaleString()}\\nParty: ${partyLedger}\\nCheck Tally Receipts.`);
+            await client.sendMessage(from, `✅ Payment Recorded!\nVoucher: ${result.voucherNo}\nAmount: Rs.${amount.toLocaleString()}\nParty: ${partyLedger}\nCheck Tally Receipts.`);
         } else {
             await client.sendMessage(from, `❌ Failed: ${result.error}`);
             console.error('Pay failed:', result.error);
+            console.error('Raw Tally:', rawResponse.slice(0,500));
         }
     } catch (err) {
         await client.sendMessage(from, `Error: ${err.message}`);
@@ -37,6 +38,7 @@ async function handlePay(from, body, client) {
 
 function canAccess(from) {
     const mobile = from.replace(/@c.us$/, '');
+    console.log('Pay access:', mobile, AUTH_MOBILES.includes(mobile));
     return AUTH_MOBILES.includes(mobile);
 }
 

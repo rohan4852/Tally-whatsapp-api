@@ -14,7 +14,7 @@ let isReady = false;
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-puppeteer: {
+    puppeteer: {
         headless: true,
         protocolTimeout: 60000,
         timeout: 60000,
@@ -44,16 +44,16 @@ client.on('ready', () => { isReady = true; console.log('WHATSAPP READY'); });
 client.on('disconnected', () => { isReady = false; });
 
 // Handle incoming WhatsApp messages for Tally push
-client.on('message', async (msg) => {
+client.on('message', (msg) => {
     const body = msg.body || '';
     if (body.startsWith('/pay')) {
         if (payCmd.canAccess(msg.from)) {
-            await payCmd.handlePay(msg.from, body, client);
+            payCmd.handlePay(msg.from, body, client);
         } else {
             client.sendMessage(msg.from, '❌ Unauthorized. Contact admin.');
         }
     } else if (body === '/help') {
-        client.sendMessage(msg.from, 'Commands:\\n/pay <amount> <party> - Record payment in Tally\\nEx: /pay 5000 Rohan\\n/help - this');
+        client.sendMessage(msg.from, 'Commands:\n/pay <amount> <party> - Record payment in Tally\nEx: /pay 5000 Rohan\n/help - this');
     }
 });
 
@@ -86,12 +86,12 @@ function tallyPost(xml) {
 }
 
 function getTag(xml, tag) {
-    var m = xml.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'i'));
+    var m = xml.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'i'));
     return m ? m[1].trim() : '';
 }
 
 function getAllBlocks(xml, tag) {
-    var re = new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'gi');
+    var re = new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'gi');
     var out = [], m;
     while ((m = re.exec(xml)) !== null) out.push(m[1]);
     return out;
@@ -199,12 +199,12 @@ function getSalesInvoices() {
             var partyState = getTag(content, 'STATENAME') || getTag(content, 'BUYERSTATENAME');
 
             var lineItems = [];
-            getAllBlocks(content, 'ALLINVENTORYENTRIES\\.LIST').forEach(function (e) {
+            getAllBlocks(content, 'ALLINVENTORYENTRIES.LIST').forEach(function (e) {
                 var iname = getTag(e, 'STOCKITEMNAME'); if (!iname) return;
                 lineItems.push({ name: iname, hsn: getTag(e, 'HSNCODE') || getTag(e, 'HSN'), qty: getTag(e, 'BILLEDQTY') || getTag(e, 'ACTUALQTY'), rate: getTag(e, 'RATE'), amount: parseAmt(getTag(e, 'AMOUNT')) });
             });
             if (!lineItems.length) {
-                getAllBlocks(content, 'ALLLEDGERENTRIES\\.LIST').forEach(function (e) {
+                getAllBlocks(content, 'ALLLEDGERENTRIES.LIST').forEach(function (e) {
                     var lname = getTag(e, 'LEDGERNAME'), lamt = parseAmt(getTag(e, 'AMOUNT'));
                     if (lname && lname.toLowerCase() !== party.toLowerCase() && lamt > 0)
                         lineItems.push({ name: lname, hsn: '', qty: '', rate: '', amount: lamt });
@@ -270,11 +270,12 @@ function getInvoicePdf(voucherNo) {
             'Content-Type': 'text/xml',
             'Content-Length': Buffer.byteLength(xml.trim())
         },
-        timeout: 30000,
+        timeout: 60000,
         responseType: 'arraybuffer'
-    }).then(function (r) {
-        return r.data;
-    });
+    }).catch(err => {
+        console.error('PDF Tally error:', err.response ? err.response.data.slice(0, 200) : err.message);
+        return null;
+    }).then(r => r ? r.data : null);
 }
 
 app.get('/invoices', function (req, res) {
@@ -355,21 +356,28 @@ app.post('/run', function (req, res) {
                 getInvoicePdf(inv.voucherNo)
                     .then(function (pdfBuffer) {
                         var chatId = (mobile.startsWith('91') ? mobile : '91' + mobile) + '@c.us';
-                        var msg = '*FEE REMINDER - ' + (company.name || '').toUpperCase() + '*\n\nDear *' + inv.party + '*,\n\nInvoice *' + inv.voucherNo + '* dated ' + inv.date + ' — *Rs. ' + inv.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '* pending.\n\nPlease clear dues.\n Your official pending due outstanding is attached.\n— Accounts Dept, ' + (company.name || '');
-                        var media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), 'invoice.pdf');
-                        return client.sendMessage(chatId, msg)
-                            .then(function () { return client.sendMessage(chatId, media, { caption: 'Official Fee Invoice' }); })
-                            .then(function () {
-                                console.log('Sent to ' + inv.party);
-                                results.push({ party: inv.party, mobile: mobile, voucherNo: inv.voucherNo, amount: inv.amount, status: 'sent' });
-                            });
+                        var msg = '*FEE REMINDER - ' + (company.name || '').toUpperCase() + '*\n\nDear *' + inv.party + '*,\n\nInvoice *' + inv.voucherNo + '* dated ' + inv.date + ' — *Rs. ' + inv.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '* pending.\n\nPlease clear dues.' + (pdfBuffer ? '\\nInvoice PDF attached!' : '') + '\\n— Accounts Dept, ' + (company.name || '');
+                        
+                        if (pdfBuffer) {
+                            var media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), 'invoice.pdf');
+                            return client.sendMessage(chatId, msg)
+                                .then(() => client.sendMessage(chatId, media, { caption: 'Official Invoice' }))
+                                .then(() => {
+                                    console.log('✅ PDF sent to ' + inv.party);
+                                    results.push({ party: inv.party, mobile: mobile, voucherNo: inv.voucherNo, amount: inv.amount, status: 'sent_pdf' });
+                                });
+                        } else {
+                            console.log('📱 Text-only to ' + inv.party + ' (PDF unavailable)');
+                            results.push({ party: inv.party, mobile: mobile, voucherNo: inv.voucherNo, amount: inv.amount, status: 'sent_text' });
+                            return client.sendMessage(chatId, msg);
+                        }
                     })
                     .catch(function (err) {
-                        console.error('Failed ' + inv.party + ': ' + err.message);
+                        console.error('❌ Send failed ' + inv.party + ':', err.message);
                         results.push({ party: inv.party, status: 'failed', error: err.message });
                     })
-                    .then(function () { return new Promise(function (r) { setTimeout(r, 2000); }); })
-                    .then(function () { next(i + 1); });
+                    .then(function () { return new Promise(r => setTimeout(r, 2000)); })
+                    .then(() => next(i + 1));
             }
             next(0);
         })

@@ -18,8 +18,9 @@ const client = new Client({
         headless: true,
         protocolTimeout: 60000,
         timeout: 60000,
+        ignoreHTTPSErrors: true,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
->>>>>>> d55293f42d151dca27e53e571c7516fa98267b2d
+        defaultViewport: null,
         args: [
 =======
         ignoreHTTPSErrors: true,

@@ -14,11 +14,12 @@ let isReady = false;
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
+puppeteer: {
         headless: true,
         protocolTimeout: 60000,
         timeout: 60000,
         ignoreHTTPSErrors: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -31,6 +32,9 @@ const client = new Client({
             '--disable-renderer-backgrounding',
             '--disable-web-security',
             '--disable-features=VizDisplayCompositor',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-images',
             '--user-data-dir=./whatsapp-session'
         ]
     }

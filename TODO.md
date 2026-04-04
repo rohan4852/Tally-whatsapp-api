@@ -1,9 +1,12 @@
-# Git Cleanup TODO
+# TODO: Remove node_modules from Git permanently
 
-- [x] Create TODO.md with steps
-- [x] Step 1: Unstage all files (`git restore --staged .`)
-- [x] Step 2: Update .gitignore with BFG/Puppeteer exclusions
-- [x] Step 3: Clean local junk dirs/files (rm -rf ..bfg-report/ bfg.jar)
-- [x] Step 4: Verify `git status` clean (node_modules ignored)
-- [x] Step 5: Ready for clean `git add/commit/push`
+## Steps:
+[ ] 1. Confirm no current tracking: `git ls-files | findstr node_modules` (should be empty)
+[ ] 2. Install BFG: Download bfg.jar
+[ ] 3. Clean history: `java -jar bfg.jar --delete-folders node_modules .`
+[ ] 4. Clean refs: `git reflog expire --expire=now --all && git gc --prune=now --aggressive`
+[ ] 5. Commit & push: `git push --force --all && git push --force --tags`
+[ ] 6. Test: `node index.js` (after `npm install`)
+[ ] 7. Mark complete
 
+Note: Backup repo first!

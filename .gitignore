@@ -29,3 +29,14 @@ Thumbs.db
 *.log
 logs/
 
+# BFG Repo Cleaner artifacts
+.bfg-report/
+bfg.jar
+**/*.REMOVED.git-id
+
+# Extra Puppeteer/Chromium safety
+**/*.dll
+**/*.exe
+chrome*/
+
+

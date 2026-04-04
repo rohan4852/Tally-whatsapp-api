@@ -1,11 +1,9 @@
-# Git Push Fix TODO
+# Git Cleanup TODO
 
-## Completed:
-- [x] Update .gitignore with Node.js/puppeteer ignores
-
-## Pending:
-- [ ] Step 2: Run `git rm --cached -r node_modules/ whatsapp-session/ .wwebjs_cache/` to untrack large files
-- [ ] Step 3: `git add .gitignore && git commit -m "Fix .gitignore and untrack node_modules/cache"`
-- [ ] Step 4: `git push`
-- [ ] Verify: `git status` clean, push succeeds without large file errors
+- [x] Create TODO.md with steps
+- [x] Step 1: Unstage all files (`git restore --staged .`)
+- [x] Step 2: Update .gitignore with BFG/Puppeteer exclusions
+- [x] Step 3: Clean local junk dirs/files (rm -rf ..bfg-report/ bfg.jar)
+- [x] Step 4: Verify `git status` clean (node_modules ignored)
+- [x] Step 5: Ready for clean `git add/commit/push`
 

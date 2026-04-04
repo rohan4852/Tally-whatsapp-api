@@ -15,58 +15,34 @@ let isReady = false;
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        headless: true,
+        headless: false,
         protocolTimeout: 60000,
         timeout: 60000,
         ignoreHTTPSErrors: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        headless: false,
         defaultViewport: null,
         args: [
-=======
-        ignoreHTTPSErrors: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        defaultViewport: null,
-        args: [
-=======
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
->>>>>>> d55293f42d151dca27e53e571c7516fa98267b2d
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-web-security',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-images',
-                '--user-data-dir=./whatsapp-session'
->>>>>>> d55293f42d151dca27e53e571c7516fa98267b2d
-            ]
-=======
-'--disable-features=VizDisplayCompositor',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
             '--disable-extensions',
             '--disable-plugins',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
             '--disable-images',
             '--user-data-dir=./whatsapp-session'
-        ]
-=======
-            '--disable-extensions',
-            '--disable-plugins',
-            '--disable-images',
-            '--user-data-dir=./whatsapp-session'
->>>>>>> d55293f42d151dca27e53e571c7516fa98267b2d
         ]
     }
 });
+
 client.on('qr', qr => { console.log('SCAN QR:'); qrcode.generate(qr, { small: true }); });
 client.on('ready', () => { isReady = true; console.log('WHATSAPP READY'); });
 client.on('disconnected', () => { isReady = false; });
@@ -126,7 +102,7 @@ function getAllBlocks(xml, tag) {
 }
 
 function parseAmt(s) {
-    try { return Math.abs(parseFloat(s.replace(/[^\d.\-]/g, '')) || 0); } catch (e) { return 0; }
+    try { return Math.abs(parseFloat(s.replace(/[^\d.-]/g, '')) || 0); } catch (e) { return 0; }
 }
 
 function getCompanyInfo() {
@@ -139,14 +115,14 @@ function getCompanyInfo() {
             || getTag(raw, 'NAME');
 
         if (!companyName) {
-            var cblock = raw.match(/<COMPANY[^>]*>([\s\S]*?)<\/COMPANY>/i);
+            var cblock = raw.match(/<COMPANY[^>]*>([\\s\\S]*?)<\/COMPANY>/i);
             if (cblock) companyName = getTag(cblock[1], 'NAME');
         }
 
         if (!companyName) {
-            companyName = (raw.match(/<SVCURRENTCOMPANY>([\s\S]*?)<\/SVCURRENTCOMPANY>/i) || [null, ''])[1]
-                || (raw.match(/<COMPANYNAME>([\s\S]*?)<\/COMPANYNAME>/i) || [null, ''])[1]
-                || (raw.match(/<CURRENTCOMPANY>([\s\S]*?)<\/CURRENTCOMPANY>/i) || [null, ''])[1]
+            companyName = (raw.match(/<SVCURRENTCOMPANY>([\\s\\S]*?)<\/SVCURRENTCOMPANY>/i) || [null, ''])[1]
+                || (raw.match(/<COMPANYNAME>([\\s\\S]*?)<\/COMPANYNAME>/i) || [null, ''])[1]
+                || (raw.match(/<CURRENTCOMPANY>([\\s\\S]*?)<\/CURRENTCOMPANY>/i) || [null, ''])[1]
                 || '';
         }
 
@@ -156,7 +132,7 @@ function getCompanyInfo() {
     function parseCompany(raw) {
         var companyName = findCompanyName(raw);
 
-        var b = (raw.match(/<COMPANY[^>]*>([\s\S]*?)<\/COMPANY>/i) || [null, raw])[1];
+        var b = (raw.match(/<COMPANY[^>]*>([\\s\\S]*?)<\/COMPANY>/i) || [null, raw])[1];
 
         return {
             name: companyName,
@@ -195,7 +171,7 @@ function getCompanyInfo() {
 function getLedgerMap() {
     var xml = '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>List of Accounts</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>';
     return tallyPost(xml).then(function (raw) {
-        var map = {}, re = /<LEDGER NAME="([^"]+)"[^>]*>([\s\S]*?)<\/LEDGER>/gi, m;
+        var map = {}, re = /<LEDGER NAME="([^"]+)"[^>]*>([\\s\\S]*?)<\/LEDGER>/gi, m;
         while ((m = re.exec(raw)) !== null) {
             var n = m[1].trim(), c = m[2];
             var mobile = ['LEDGERMOBILE', 'MOBILENUMBER', 'MOBILE', 'PHONENUMBER'].map(function (t) { return getTag(c, t); }).filter(Boolean)[0] || '';
@@ -207,23 +183,22 @@ function getLedgerMap() {
     }).catch(function (e) { console.error('Ledger err:', e.message); return {}; });
 }
 
-function getSalesInvoices() {
+function getReceiptVouchers() {
     function mkXml(fmt) {
-        return '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>' + fmt + '</SVEXPORTFORMAT><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>';
+        return '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>' + fmt + '</SVEXPORTFORMAT><VOUCHERTYPENAME>Receipt Vouchers</VOUCHERTYPENAME></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>';
     }
     return tallyPost(mkXml('$$SysName:XML')).then(function (r1) {
         return (r1.match(/<VOUCHER/gi) || []).length > 0 ? r1 : tallyPost(mkXml('$SysName:XML'));
     }).then(function (raw) {
-        var invoices = [];
+        var receipts = [];
         getAllBlocks(raw, 'VOUCHER').forEach(function (content) {
-            if (getTag(content, 'VOUCHERTYPENAME').toLowerCase().indexOf('sales') === -1) return;
+            if (getTag(content, 'VOUCHERTYPENAME').toLowerCase().indexOf('receipt') === -1) return;
             var party = getTag(content, 'PARTYLEDGERNAME') || getTag(content, 'PARTYNAME');
             var voucherNo = getTag(content, 'VOUCHERNUMBER');
             var date = getTag(content, 'DATE');
             if (date.length === 8) date = date.slice(6) + '-' + date.slice(4, 6) + '-' + date.slice(0, 4);
             var amount = parseAmt(getTag(content, 'AMOUNT'));
             var narration = getTag(content, 'NARRATION');
-            var eway = getTag(content, 'EWAYBILLNO') || getTag(content, 'EWAYBILLNUMBER');
             var partyState = getTag(content, 'STATENAME') || getTag(content, 'BUYERSTATENAME');
 
             var lineItems = [];
@@ -239,10 +214,10 @@ function getSalesInvoices() {
                 });
             }
             if (!lineItems.length) lineItems = [{ name: narration || 'Fee Charges', hsn: '', qty: '', rate: '', amount: amount }];
-            if (party && amount > 0) invoices.push({ party: party, voucherNo: voucherNo, date: date, amount: amount, narration: narration, eway: eway, partyState: partyState, lineItems: lineItems });
+            if (party && amount > 0) receipts.push({ party: party, voucherNo: voucherNo, date: date, amount: amount, narration: narration, partyState: partyState, lineItems: lineItems });
         });
-        return invoices;
-    }).catch(function (e) { console.error('Invoice err:', e.message); return []; });
+        return receipts;
+    }).catch(function (e) { console.error('Receipt err:', e.message); return []; });
 }
 
 app.get('/ping-tally', function (req, res) {
@@ -254,15 +229,27 @@ app.get('/ping-tally', function (req, res) {
 
 app.get('/status', function (req, res) { res.json({ ready: isReady }); });
 
+app.get('/receipts', function (req, res) {
+    getReceiptVouchers()
+        .then(function (receipts) { res.json({ ok: true, receipts: receipts }); })
+        .catch(function (e) { res.status(500).json({ ok: false, error: e.message }); });
+});
+
+app.get('/receipt/:voucherNo', function (req, res) {
+    getVoucherDetails(req.params.voucherNo, 'Receipt Vouchers', req.query.fromDate, req.query.toDate)
+        .then(function (raw) { res.set('Content-Type', 'application/xml').send(raw); })
+        .catch(function (e) { res.status(500).json({ ok: false, error: e.message }); });
+});
+
 app.get('/debug', function (req, res) {
     function mkXml(fmt) {
-        return '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>' + fmt + '</SVEXPORTFORMAT><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>';
+        return '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>' + fmt + '</SVEXPORTFORMAT><VOUCHERTYPENAME>Receipt Vouchers</VOUCHERTYPENAME></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>';
     }
     Promise.all([tallyPost(mkXml('$$SysName:XML')), tallyPost(mkXml('$SysName:XML'))])
         .then(function (results) {
             res.json({
-                voucher_count_dd: (results[0].match(/<VOUCHER/gi) || []).length,
-                voucher_count_sd: (results[1].match(/<VOUCHER/gi) || []).length,
+                receipt_count_dd: (results[0].match(/<VOUCHER/gi) || []).length,
+                receipt_count_sd: (results[1].match(/<VOUCHER/gi) || []).length,
                 raw_dd: results[0].slice(0, 3000),
                 raw_sd: results[1].slice(0, 3000)
             });
@@ -271,7 +258,7 @@ app.get('/debug', function (req, res) {
 });
 
 function getVoucherDetails(voucherNo, voucherType, fromDate, toDate) {
-    voucherType = voucherType || 'Sales';
+    voucherType = voucherType || 'Receipt Vouchers';
     fromDate = fromDate || '19000101';
     toDate = toDate || '20991231';
     var xml = '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES>' +
@@ -284,10 +271,10 @@ function getVoucherDetails(voucherNo, voucherType, fromDate, toDate) {
     return tallyPost(xml);
 }
 
-function getInvoicePdf(voucherNo) {
+function getReceiptPdf(voucherNo) {
     var xml = '<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES>' +
         '<SVEXPORTFORMAT>PDF</SVEXPORTFORMAT>' +
-        '<VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>' +
+        '<VOUCHERTYPENAME>Receipt Vouchers</VOUCHERTYPENAME>' +
         '<SVVOUCHERNUMBER>' + voucherNo + '</SVVOUCHERNUMBER>' +
         '</STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>';
     return axios({
@@ -306,55 +293,43 @@ function getInvoicePdf(voucherNo) {
     }).then(r => r ? r.data : null);
 }
 
-app.get('/invoices', function (req, res) {
-    getSalesInvoices()
-        .then(function (invoices) { res.json({ ok: true, invoices: invoices }); })
-        .catch(function (e) { res.status(500).json({ ok: false, error: e.message }); });
-});
-
-app.get('/invoice/:voucherNo', function (req, res) {
-    getVoucherDetails(req.params.voucherNo, req.query.type || 'Sales', req.query.fromDate, req.query.toDate)
-        .then(function (raw) { res.set('Content-Type', 'application/xml').send(raw); })
-        .catch(function (e) { res.status(500).json({ ok: false, error: e.message }); });
-});
-
 app.post('/run-text', function (req, res) {
     var results = [];
     waitReady()
         .then(function () {
-            return Promise.all([getCompanyInfo(), getLedgerMap(), getSalesInvoices()]);
+            return Promise.all([getCompanyInfo(), getLedgerMap(), getReceiptVouchers()]);
         })
         .then(function (data) {
-            var company = data[0], ledgerMap = data[1], invoices = data[2];
-            console.log('Company: ' + (company.name || 'not found') + '  Invoices: ' + invoices.length);
-            if (!invoices.length) { res.json({ status: 'done', message: 'No sales invoices found', results: [] }); return; }
+            var company = data[0], ledgerMap = data[1], receipts = data[2];
+            console.log('Company: ' + (company.name || 'not found') + '  Receipts: ' + receipts.length);
+            if (!receipts.length) { res.json({ status: 'done', message: 'No receipt vouchers found', results: [] }); return; }
 
             function next(i) {
-                if (i >= invoices.length) { res.json({ status: 'done', company: company.name || 'Unknown Company', total: invoices.length, results: results }); return; }
-                var inv = invoices[i];
-                var info = ledgerMap[inv.party] || {};
+                if (i >= receipts.length) { res.json({ status: 'done', company: company.name || 'Unknown Company', total: receipts.length, results: results }); return; }
+                var rec = receipts[i];
+                var info = ledgerMap[rec.party] || {};
                 var mobile = (info.mobile || '').replace(/\D/g, '');
-                if (!mobile) { results.push({ party: inv.party, status: 'skipped', reason: 'no mobile' }); return next(i + 1); }
+                if (!mobile) { results.push({ party: rec.party, status: 'skipped', reason: 'no mobile' }); return next(i + 1); }
 
                 var chatId = (mobile.startsWith('91') ? mobile : '91' + mobile) + '@c.us';
-                var msg = '*FEE REMINDER - ' + (company.name || '').toUpperCase() + '*\n\n' +
-                    'Dear *' + inv.party + '*,\n\n' +
-                    'Invoice *' + inv.voucherNo + '* dated ' + inv.date + ' — *Rs. ' + inv.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '* pending.\n\n' +
-                    'Please clear dues as per Tally record.\n\n' +
-                    'Amount: Rs. ' + inv.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '\n' +
-                    'Party: ' + inv.party + '\n' +
-                    'Date: ' + inv.date + '\n' +
-                    'Narration: ' + (inv.narration || 'N/A') + '\n\n' +
+                var msg = '*RECEIPT CONFIRMATION - ' + (company.name || '').toUpperCase() + '*\\n\\n' +
+                    'Dear *' + rec.party + '* ,\\n\\n' +
+                    'Receipt *' + rec.voucherNo + '* dated ' + rec.date + ' — *Rs. ' + rec.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '* recorded.\\n\\n' +
+                    'Thank you for your payment!\\n\\n' +
+                    'Amount: Rs. ' + rec.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '\\n' +
+                    'Party: ' + rec.party + '\\n' +
+                    'Date: ' + rec.date + '\\n' +
+                    'Narration: ' + (rec.narration || 'N/A') + '\\n\\n' +
                     '— Accounts Dept, ' + (company.name || '');
 
                 client.sendMessage(chatId, msg)
                     .then(function () {
-                        console.log('Sent text to ' + inv.party);
-                        results.push({ party: inv.party, mobile: mobile, voucherNo: inv.voucherNo, amount: inv.amount, status: 'sent' });
+                        console.log('Sent receipt to ' + rec.party);
+                        results.push({ party: rec.party, mobile: mobile, voucherNo: rec.voucherNo, amount: rec.amount, status: 'sent' });
                     })
                     .catch(function (err) {
-                        console.error('Failed ' + inv.party + ': ' + err.message);
-                        results.push({ party: inv.party, status: 'failed', error: err.message });
+                        console.error('Failed ' + rec.party + ': ' + err.message);
+                        results.push({ party: rec.party, status: 'failed', error: err.message });
                     })
                     .then(function () { return new Promise(function (r) { setTimeout(r, 1500); }); })
                     .then(function () { next(i + 1); });
@@ -368,41 +343,41 @@ app.post('/run', function (req, res) {
     var results = [];
     waitReady()
         .then(function () {
-            return Promise.all([getCompanyInfo(), getLedgerMap(), getSalesInvoices()]);
+            return Promise.all([getCompanyInfo(), getLedgerMap(), getReceiptVouchers()]);
         })
         .then(function (data) {
-            var company = data[0], ledgerMap = data[1], invoices = data[2];
-            console.log('Company: ' + (company.name || 'not found') + '  Invoices: ' + invoices.length);
-            if (!invoices.length) { res.json({ status: 'done', message: 'No sales invoices found', results: [] }); return; }
+            var company = data[0], ledgerMap = data[1], receipts = data[2];
+            console.log('Company: ' + (company.name || 'not found') + '  Receipts: ' + receipts.length);
+            if (!receipts.length) { res.json({ status: 'done', message: 'No receipt vouchers found', results: [] }); return; }
 
             function next(i) {
-                if (i >= invoices.length) { res.json({ status: 'done', company: company.name || 'Unknown Company', total: invoices.length, results: results }); return; }
-                var inv = invoices[i];
-                var info = ledgerMap[inv.party] || {};
+                if (i >= receipts.length) { res.json({ status: 'done', company: company.name || 'Unknown Company', total: receipts.length, results: results }); return; }
+                var rec = receipts[i];
+                var info = ledgerMap[rec.party] || {};
                 var mobile = (info.mobile || '').replace(/\D/g, '');
-                if (!mobile) { results.push({ party: inv.party, status: 'skipped', reason: 'no mobile' }); return next(i + 1); }
-                getInvoicePdf(inv.voucherNo)
+                if (!mobile) { results.push({ party: rec.party, status: 'skipped', reason: 'no mobile' }); return next(i + 1); }
+                getReceiptPdf(rec.voucherNo)
                     .then(function (pdfBuffer) {
                         var chatId = (mobile.startsWith('91') ? mobile : '91' + mobile) + '@c.us';
-                        var msg = '*FEE REMINDER - ' + (company.name || '').toUpperCase() + '*\n\nDear *' + inv.party + '*,\n\nInvoice *' + inv.voucherNo + '* dated ' + inv.date + ' — *Rs. ' + inv.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '* pending.\n\nPlease clear dues.' + (pdfBuffer ? '\\nInvoice PDF attached!' : '') + '\\n— Accounts Dept, ' + (company.name || '');
+                        var msg = '*RECEIPT CONFIRMATION - ' + (company.name || '').toUpperCase() + '*\\n\\nDear *' + rec.party + '* ,\\n\\nReceipt *' + rec.voucherNo + '* dated ' + rec.date + ' — *Rs. ' + rec.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) + '* recorded.\\n\\nThank you!' + (pdfBuffer ? '\\nReceipt PDF attached!' : '') + '\\n— Accounts Dept, ' + (company.name || '');
 
                         if (pdfBuffer) {
-                            var media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), 'invoice.pdf');
+                            var media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), 'receipt.pdf');
                             return client.sendMessage(chatId, msg)
-                                .then(() => client.sendMessage(chatId, media, { caption: 'Official Invoice' }))
+                                .then(() => client.sendMessage(chatId, media, { caption: 'Official Receipt' }))
                                 .then(() => {
-                                    console.log('✅ PDF sent to ' + inv.party);
-                                    results.push({ party: inv.party, mobile: mobile, voucherNo: inv.voucherNo, amount: inv.amount, status: 'sent_pdf' });
+                                    console.log('✅ PDF receipt sent to ' + rec.party);
+                                    results.push({ party: rec.party, mobile: mobile, voucherNo: rec.voucherNo, amount: rec.amount, status: 'sent_pdf' });
                                 });
                         } else {
-                            console.log('📱 Text-only to ' + inv.party + ' (PDF unavailable)');
-                            results.push({ party: inv.party, mobile: mobile, voucherNo: inv.voucherNo, amount: inv.amount, status: 'sent_text' });
+                            console.log('📱 Text-only receipt to ' + rec.party + ' (PDF unavailable)');
+                            results.push({ party: rec.party, mobile: mobile, voucherNo: rec.voucherNo, amount: rec.amount, status: 'sent_text' });
                             return client.sendMessage(chatId, msg);
                         }
                     })
                     .catch(function (err) {
-                        console.error('❌ Send failed ' + inv.party + ':', err.message);
-                        results.push({ party: inv.party, status: 'failed', error: err.message });
+                        console.error('❌ Receipt send failed ' + rec.party + ':', err.message);
+                        results.push({ party: rec.party, status: 'failed', error: err.message });
                     })
                     .then(function () { return new Promise(r => setTimeout(r, 2000)); })
                     .then(() => next(i + 1));

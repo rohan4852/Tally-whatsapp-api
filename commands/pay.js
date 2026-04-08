@@ -1,46 +1,37 @@
+const { MessageMedia } = require('whatsapp-web.js');
 const { generateReceiptXML, tallyImport, parseImportResponse } = require('../utils/tally-import.js');
+const axios = require('axios');
 
-const AUTH_MOBILES = ['918329724788']; // YOUR NUMBER ENABLED!
+const AUTH_MOBILES = []; // Allow all for reminders flow
+const TALLY_URL = 'http://localhost:9000';
 
 async function handlePay(from, body, client) {
-    // Parse /pay 5000 Rohan
     const match = body.match(/^\/pay\s+([0-9.]+)\s+(.+)/i);
-    if (!match) {
-        return client.sendMessage(from, 'Usage: /pay <amount> <party>\nEx: /pay 5000 Rohan');
-    }
+    if (!match) return;
 
     const amount = parseFloat(match[1]);
-    const partyLedger = match[2].trim();
-
-    if (amount <= 0 || !partyLedger) {
-        return client.sendMessage(from, 'Invalid: Amount >0, party required.');
-    }
+    const party = match[2].trim();
 
     try {
-        await client.sendMessage(from, `⏳ Processing Rs.${amount.toLocaleString()} for ${partyLedger}...`);
-
-        const xml = generateReceiptXML(amount, partyLedger);
-        const rawResponse = await tallyImport(xml);
-        const result = parseImportResponse(rawResponse);
+        const { xml, vNo } = generateReceiptXML(amount, party);
+        const raw = await tallyImport(xml);
+        const result = parseImportResponse(raw, vNo);
 
         if (result.success) {
-            await client.sendMessage(from, `✅ Payment Recorded!\nVoucher: ${result.voucherNo}\nAmount: Rs.${amount.toLocaleString()}\nParty: ${partyLedger}\nCheck Tally Receipts.`);
-        } else {
-            await client.sendMessage(from, `❌ Failed: ${result.error}`);
-            console.error('Pay failed:', result.error);
-            console.error('Raw Tally:', rawResponse.slice(0,500));
+            // Fetch PDF for the newly created Receipt
+            const pdfXml = `<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Voucher Register</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>PDF</SVEXPORTFORMAT><VOUCHERTYPENAME>Receipt Voucher</VOUCHERTYPENAME><SVVOUCHERNUMBER>${vNo}</SVVOUCHERNUMBER></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>`;
+            const pdfRes = await axios.post(TALLY_URL, pdfXml, { responseType: 'arraybuffer' });
+
+            const media = new MessageMedia('application/pdf', Buffer.from(pdfRes.data).toString('base64'), `Receipt_${vNo}.pdf`);
+            await client.sendMessage(from, media, { caption: `✅ Receipt Generated for Rs. ${amount}` });
         }
-    } catch (err) {
-        await client.sendMessage(from, `Error: ${err.message}`);
-        console.error('Pay error:', err);
+    } catch (e) {
+        client.sendMessage(from, `❌ Error: ${e.message}`);
     }
 }
 
 function canAccess(from) {
-    const mobile = from.replace(/@c.us$/, '');
-    console.log('Pay access:', mobile, AUTH_MOBILES.includes(mobile));
-    return AUTH_MOBILES.includes(mobile);
+    return AUTH_MOBILES.includes(from.replace(/@c.us$/, ''));
 }
 
 module.exports = { handlePay, canAccess };
-

@@ -1,72 +1,42 @@
 const axios = require('axios');
 const TALLY_URL = 'http://localhost:9000';
 
-// Generate XML for Receipt Voucher import
-function generateReceiptXML(amount, partyLedger, narration = 'Payment received via WhatsApp') {
+function generateReceiptXML(amount, partyLedger) {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const voucherNumber = `WAPP-${Date.now()}`;
+  const vNo = `WAPP${Date.now().toString().slice(-6)}`;
 
-  return `<ENVELOPE>
-<HEADER>
-  <VERSION>1</VERSION>
-  <TALLYREQUEST>Import</TALLYREQUEST>
-  <TYPE>Data</TYPE>
-  <ID>udf</ID>
-</HEADER>
-<BODY>
-  <DESC>
-    <STATICVARIABLES>
-      <IMPORTDATE>${today}</IMPORTDATE>
-    </STATICVARIABLES>
-  </DESC>
-  <DATA>
-    <TALLYMESSAGE>
-      <VOUCHER VCHTYPE="Receipt" ACTION="Create">
-        <DATE>${today}</DATE>
-        <VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME>
-        <VOUCHERNUMBER>${voucherNumber}</VOUCHERNUMBER>
-        <NARRATION>${narration}</NARRATION>
-        <ALLLEDGERENTRIES.LIST>
-          <LEDGERNAME>Cash</LEDGERNAME>
-          <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-          <AMOUNT>${amount}</AMOUNT>
-        </ALLLEDGERENTRIES.LIST>
-        <ALLLEDGERENTRIES.LIST>
-          <LEDGERNAME>${partyLedger}</LEDGERNAME>
-          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-          <AMOUNT>-${amount}</AMOUNT>
-        </ALLLEDGERENTRIES.LIST>
-      </VOUCHER>
-    </TALLYMESSAGE>
-  </DATA>
-</BODY>
-</ENVELOPE>`;
+  const xml = `<ENVELOPE>
+        <HEADER><TALLYREQUEST>Import</TALLYREQUEST><TYPE>Data</TYPE></HEADER>
+        <BODY><DATA><TALLYMESSAGE xmlns:UDF="TallyUDF">
+            <VOUCHER VCHTYPE="Receipt Voucher" ACTION="Create">
+                <DATE>${today}</DATE>
+                <VOUCHERTYPENAME>Receipt Voucher</VOUCHERTYPENAME>
+                <VOUCHERNUMBER>${vNo}</VOUCHERNUMBER>
+                <PARTYLEDGERNAME>${partyLedger}</PARTYLEDGERNAME>
+                <ALLLEDGERENTRIES.LIST>
+                    <LEDGERNAME>Cash</LEDGERNAME>
+                    <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                    <AMOUNT>-${amount}</AMOUNT>
+                </ALLLEDGERENTRIES.LIST>
+                <ALLLEDGERENTRIES.LIST>
+                    <LEDGERNAME>${partyLedger}</LEDGERNAME>
+                    <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+                    <AMOUNT>${amount}</AMOUNT>
+                </ALLLEDGERENTRIES.LIST>
+            </VOUCHER>
+        </TALLYMESSAGE></DATA></BODY>
+    </ENVELOPE>`;
+  return { xml, vNo }; // Return both
 }
 
-// POST Import XML to Tally (reuse logic)
-function tallyImport(xml) {
-  return axios({
-    method: 'post',
-    url: TALLY_URL,
-    data: xml.trim(),
-    headers: {
-      'Content-Type': 'text/xml',
-      'Content-Length': Buffer.byteLength(xml.trim())
-    },
-    timeout: 30000,
-    responseType: 'text'
-  }).then(r => r.data.replace(/&#\\d+;/g, ''));
+async function tallyImport(xml) {
+  const r = await axios.post(TALLY_URL, xml, { headers: { 'Content-Type': 'text/xml' } });
+  return r.data;
 }
 
-// Parse Tally Import response
-function parseImportResponse(raw) {
-  const created = raw.match(/VOUCHER.*CREATED/i);
-  const error = raw.match(/ERROR|FAILED/i);
-  const voucherNo = raw.match(/VOUCHERNUMBER[^<]*<[^<]*/i)?.[0] || 'Unknown';
-
-  if (created) return { success: true, voucherNo: voucherNo.replace(/[^\w]/g, ''), raw };
-  if (error) return { success: false, error: 'Tally rejected: ' + (raw.match(/LINEERROR|MSGSTR/i)?.[0] || 'Unknown'), raw };
-  return { success: false, error: 'Invalid response', raw };
+function parseImportResponse(raw, vNo) {
+  if (raw.includes('<CREATED>1</CREATED>')) return { success: true, voucherNo: vNo };
+  return { success: false, error: 'Tally Import Failed' };
 }
 
 module.exports = { generateReceiptXML, tallyImport, parseImportResponse };
